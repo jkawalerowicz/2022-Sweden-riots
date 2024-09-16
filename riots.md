@@ -923,6 +923,9 @@ To find where Quran buring demos took place we read in the demo file
 that Jeff got from the police and focus only on 2022. I looked up
 addresses and added coordinates manually in the file.
 
+In the figure below Deso neighborhoods are in light blue and
+demonstrations are red points.
+
 ``` r
 demo <- read_excel("demo_data/A466.302-2024.xlsx")
 ```
@@ -1046,7 +1049,7 @@ ggplot() +
   geom_sf(data = deso, fill = "lightblue", color = "black") +  
   geom_sf(data = demo_transformed, color = "red", size = 2) +
   theme_minimal() +
-  labs(title = "DeSo areas in blue, demo places in red")
+  labs(title = "DeSo and demo")
 ```
 
 ![](riots_files/figure-gfm/demo-1.png)<!-- -->
@@ -1068,7 +1071,7 @@ deso <- deso %>%
 ```
 
 Generate a database with neighborhood statistics and create shares for
-variables. Add neighbourhood area and population density.
+variables. Add neighborhood area and population density.
 
 ``` r
 database <- empl %>%
