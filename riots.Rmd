@@ -1,0 +1,1004 @@
+---
+title: "Explaining the Easter Riots in Sweden"
+author: "Juta"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+    output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#Change to your local directory
+#setwd("C:/Users/juka4948/Documents/Jeff Riots")
+
+library(sf)
+library(readxl)
+library(tidyverse)
+library(reshape2)
+library(RColorBrewer)
+library(ggplot2)
+library(cowplot)
+library(corrplot)
+library(MASS)
+library(AER)
+library(performance)
+library(GGally)
+library(ggeffects)
+library(broom.helpers)
+
+```
+
+## Riot-related crimes overtimes
+
+See the list of riot-related crimes where we have:
+
+* cars burned
+* arson
+* violence against police offices (both light and heavy)
+* police sabotage
+* rioting 
+
+We start by reading it the data and examining the patterns overtime. 
+
+### Cars burned
+
+Data recorded between 2010 and 2024 but the number of events remains largely flat until 2019 when they shot to above 100 recorded crimes each month.
+
+```{r bilbrand}
+
+bilbrand<-read.csv("crime_data/bilbrand brott.csv")
+
+glimpse(bilbrand)
+
+#create monthly sums
+bilbrand.month <- bilbrand %>%  
+  #extract year and month
+  mutate(new_date = (substr(Brottsdatum, 1, 7))) %>%
+  group_by(new_date) %>%
+  summarise(Freq = sum(Antal))
+
+bilbrand.month$new_date <- as.Date(paste0(bilbrand.month$new_date, "-01"))
+
+
+ggplot(bilbrand.month, aes(x = new_date, y = Freq)) +
+  geom_line() +
+  geom_point() +
+  scale_x_date(date_breaks = "1 year",
+               date_labels = "%Y") +
+  geom_vline(xintercept = as.Date("2022-04-01"),
+             linetype = 2, color = 2, linewidth = 1) +
+  xlab("Month") +
+  ylab("Events") +
+  theme_bw()
+
+```
+
+Would be good to figure out why there are no car burnings recorded for earlier years. One possibility is that they were recorded under a different crime category?
+
+> In Swedish statistics, car burnings (as long as the crime does not endanger the lives of others) are reported by the National Council for Crime Prevention (BRÅ) under the category: vandalism and aggravated criminal damage, subcategory damage by fire (Malmberg, Andersson and Östh, 2013)
+
+### Police sabotage
+
+Data starts in 2019 and ends in 2024. 
+
+
+```{r blaljussabotage}
+
+blaljussabotage<-read.csv("crime_data/blåljus sabotage brott.csv")
+
+glimpse(blaljussabotage)
+
+sabotage.month <- blaljussabotage %>%  
+  mutate(new_date = (substr(Brottsdatum, 1, 7))) %>%
+  group_by(new_date) %>%
+  summarise(Freq = sum(Antal))
+
+sabotage.month$new_date <- as.Date(paste0(sabotage.month$new_date, "-01"))
+
+ggplot(sabotage.month, aes(x = new_date, y = Freq))+
+  geom_line() +
+  geom_point() +
+  scale_x_date(date_breaks = "1 year",
+               date_labels = "%Y") +
+  geom_vline(xintercept = as.Date("2022-04-01"),
+             linetype = 2, color = 2, linewidth = 1) +
+  xlab("Month") +
+  ylab("Events") +
+  theme_bw()
+```
+
+### Arson
+
+Data starts in 2000 and ends in 2024. Similar to car burnings the data is largely flat until 2019.
+
+```{r brand}
+brand<-read.csv("crime_data/brand brott.csv")
+
+glimpse(brand)
+
+brand.month <- brand %>%  
+  mutate(new_date = (substr(Brottsdatum, 1, 7))) %>%
+  group_by(new_date) %>%
+  summarise(Freq = sum(Antal))
+
+brand.month$new_date <- as.Date(paste(brand.month$new_date, "-01", sep=""))
+
+ggplot(brand.month, aes(x = new_date, y = Freq))+
+  geom_line() +
+  geom_point() +
+  scale_x_date(date_breaks = "2 years",
+               date_labels = "%Y") +
+  geom_vline(xintercept = as.Date("2022-04-01"),
+             linetype = 2, color = 2, linewidth = 1) +
+  xlab("Month") + 
+  ylab("Events") +
+  theme_bw()
+
+```
+
+### Violence against police officers
+
+Violence which does not result in inability to work for more than 24 hours. Data starts in 2010 and ends in 2024. 
+
+
+```{r våld1}
+vald1<-read.csv("crime_data/våld mot polis 1 brott.csv")
+
+glimpse(vald1)
+
+vald1.month <- vald1 %>%  
+  mutate(new_date = (substr(Brottsdatum, 1, 7))) %>%
+  group_by(new_date) %>%
+  summarise(Freq = sum(Antal))
+
+vald1.month$new_date <- as.Date(paste(vald1.month$new_date, "-01", sep=""))
+
+ggplot(vald1.month, aes(x = new_date, y = Freq))+
+  geom_line() +
+  geom_point() +
+  scale_x_date(date_breaks = "1 year",
+               date_labels = "%Y") +
+  geom_vline(xintercept = as.Date("2022-04-01"),
+             linetype = 2, color = 2, linewidth = 1) +
+  xlab("Month") + 
+  ylab("Events") +
+  theme_bw()
+
+```
+
+###  Violence against police officers
+
+Violence which does result in inability to work for more than 24 hours. Data starts in 2017 and ends in 2024. 
+
+
+```{r våld2}
+vald2<-read.csv("crime_data/våld mot polis 2 brott.csv")
+
+glimpse(vald2)
+
+vald2.month <- vald2 %>%  
+  mutate(new_date = (substr(Brottsdatum, 1, 7))) %>%
+  group_by(new_date) %>%
+  summarise(Freq = sum(Antal))
+
+vald2.month$new_date <- as.Date(paste(vald2.month$new_date, "-01", sep=""))
+
+ggplot(vald2.month, aes(x = new_date, y = Freq))+
+  geom_line() +
+  geom_point() +
+  scale_x_date(date_breaks = "1 year",
+               date_labels = "%Y") +
+  geom_vline(xintercept = as.Date("2022-04-01"),
+             linetype = 2, color = 2, linewidth = 1) +
+  xlab("Month") + 
+  ylab("Events") +
+  theme_bw()
+
+```
+
+Combine two types of violence against police crimes 
+
+
+```{r vald}
+vald<-bind_rows(vald1, vald2)
+
+vald.month <- vald %>%  
+  mutate(new_date = (substr(Brottsdatum, 1, 7))) %>%
+  group_by(new_date) %>%
+  summarise(Freq = sum(Antal))
+
+vald.month$new_date <- as.Date(paste(vald.month$new_date, "-01", sep=""))
+
+ggplot(vald.month, aes(x = new_date, y = Freq))+
+  geom_line() +
+  geom_point() +
+  scale_x_date(date_breaks = "1 year",
+               date_labels = "%Y") +
+  geom_vline(xintercept = as.Date("2022-04-01"),
+             linetype = 2, color = 2, linewidth = 1) +
+  xlab("Month") + 
+  ylab("Events") +
+  theme_bw()
+
+```
+
+### Riots
+
+Data starts in 2020 and ends in 2024. 
+
+
+```{r upplopp}
+upplopp<-read.csv("crime_data/upplopp brott.csv")
+
+upplopp.month <- upplopp %>%  
+  mutate(new_date = (substr(Brottsdatum, 1, 7))) %>%
+  group_by(new_date) %>%
+  summarise(Freq = sum(Antal))
+
+upplopp.month$new_date <- as.Date(paste(upplopp.month$new_date, "-01", sep=""))
+
+ggplot(upplopp.month, aes(x = new_date, y = Freq))+
+  geom_line() +
+  geom_point() +
+  scale_x_date(date_breaks = "1 year",
+               date_labels = "%Y") +
+  geom_vline(xintercept = as.Date("2022-04-01"),
+             linetype = 2, color = 2, linewidth = 1) +
+  xlab("Month")+ #change axis lables
+  ylab("Events") +
+  theme_bw()
+```
+
+After inspecting time trends it seems that a common point to start looking at the data is 2020. 
+
+
+```{r filter}
+
+bilbrand.month <- bilbrand.month %>%
+  filter(new_date >= as.Date("2020-01-01"))
+sabotage.month <- sabotage.month %>%
+  filter(new_date >= as.Date("2020-01-01"))
+brand.month <- brand.month %>%
+  filter(new_date >= as.Date("2020-01-01"))
+vald.month <- vald.month %>%
+  filter(new_date >= as.Date("2020-01-01"))
+upplopp.month <- upplopp.month %>%
+  filter(new_date >= as.Date("2020-01-01"))
+
+data.month <- bilbrand.month %>%
+  left_join(sabotage.month, by = c("new_date")) %>%
+  left_join(brand.month, by = c("new_date")) %>%
+  left_join(vald.month, by = c("new_date")) %>%
+  left_join(upplopp.month, by = c("new_date")) %>%
+  mutate(across(2:6, ~replace_na(., 0)))
+
+data.month <- data.month %>%
+  rename(bilbrand = names(.)[2], sabotage = names(.)[3], brand = names(.)[4], vald = names(.)[5], upplopp = names(.)[6])
+
+data.month_long <- melt(data.month, id = "new_date") 
+
+ggplot(data.month_long, aes(x = new_date, y = value, color = variable)) +  
+  geom_line() +
+  geom_point() + 
+  scale_x_date(date_breaks = "1 year",
+               date_labels = "%Y") +
+  geom_vline(xintercept = as.Date("2022-04-01"),
+             linetype = 2, color = 2, linewidth = 1) +
+  xlab("Month")+
+  ylab("Events") +
+  scale_color_manual(name="Type", values = c("#1f77b4", "#ff7f0e", "#2ca02c", "#9467bd", "#d62728"), 
+                     labels = c("Bilbrand", "Blåljus sabotage", "Brand", "Våld", "Upplop")) +
+  theme_bw()
+
+```
+One potential issue is that we don't know how this measures rioting and at some point it would be good to cross check geographical distribution of rioting measured with recorded crimes with newspaper coverage. Also it looks like the best crimes for capturing 2022 rioting are: upplop, våld and blåljus sabotage. 
+
+
+## Rates for crimes in 2022
+
+Now let's look at which area had highest rates of rioting in 2022 for each of these crime categories. 
+
+```{r year}
+
+#read in shapefile for DeSo and utsatta områden
+deso <- st_read("boundaries/deso_2018_2021-10-21/DeSO_2018_v2.gpkg")
+areas <- st_read("boundaries/uso_2023_shp/uso_2023.shp")
+
+areas <- st_zm(areas)
+
+#read in data with population for DeSo 
+pop <- read_excel("deso_data/000005FC_20240806-102837.xlsx",
+                  skip=2)[,c(-1)]
+pop <- pop %>% 
+  rename_with(~c("deso", "total"))
+
+# Filter crime data and calculate frequency then join with population data and calculate rates
+
+calculate_rates <- function(crime_data) 
+  {crime_sum <- crime_data %>%
+  filter(substr(!!sym("Brottsdatum"), 1, 4) == "2022") %>%
+  rename("deso" = !!sym("DeSO.område")) %>%
+  group_by(deso) %>%
+  summarise(Freq = sum(Antal))
+  
+#potential problem some DeSo have higher turnover rates
+crime_sum_with_rate <- pop %>% 
+  left_join(crime_sum, by = "deso") %>% 
+  mutate(Freq = replace_na(Freq, 0)) %>% 
+  mutate(Rate = Freq / !!sym("total") * 1000)
+
+deso_crime <- deso %>% 
+  left_join(crime_sum_with_rate)
+
+  return(deso_crime)
+}
+
+bilbrand_sum_with_rate <- calculate_rates(crime_data = bilbrand)
+sabotage_sum_with_rate <- calculate_rates(crime_data = blaljussabotage)
+brand_sum_with_rate <- calculate_rates(crime_data = brand)
+vald_sum_with_rate <- calculate_rates(crime_data = vald)
+upplopp_sum_with_rate <- calculate_rates(crime_data = upplopp)
+
+```
+### Maps for 3 metropolitan municipalities
+
+Supplemented by top 10 neighbourhood (DeSO) with the highest rates
+
+```{r mapping}
+
+plot_kommun_maps <- function(deso_data, areas_data, kommun_ort_pairs, title, colors = "YlGnBu", label_size = 9, nrow = 2) {
+  
+  # Get the range for scaling
+  rate_range <- range(deso_data$Rate, na.rm = TRUE)
+  
+  # Create the individual plots
+  plot_list <- lapply(kommun_ort_pairs, function(pair) {
+    kommun_code <- pair$kommun
+    ort_name <- pair$ort
+    
+    ggplot() +
+      geom_sf(data = deso_data[deso_data$kommun == kommun_code, ], aes(fill = Rate), lwd = 0.1) + 
+      geom_sf(data = areas_data[areas_data$ORT == ort_name, ], colour = "red", fill = NA) +
+      scale_fill_gradientn(limits = rate_range, colors = RColorBrewer::brewer.pal(4, colors)) + 
+      theme_void() +
+      
+      theme(legend.position = 'none')
+  })
+  
+  # Create a separate plot with a legend
+  p_legend <- ggplot() +
+    geom_sf(data = deso_data[deso_data$kommun == kommun_ort_pairs[[1]]$kommun, ], aes(fill = Rate), lwd = 0.1) + 
+    geom_sf(data = areas_data[areas_data$ORT == kommun_ort_pairs[[1]]$ort, ], colour = "red", fill = NA) +
+    scale_fill_gradientn(limits = rate_range, colors = RColorBrewer::brewer.pal(4, colors))
+  
+  # Add the legend to the plot list
+  plot_list_with_legend <- c(plot_list, list(get_legend(p_legend)))
+  
+  # Create the plot grid
+  plot_grid_figure <- plot_grid(plotlist = plot_list_with_legend, 
+                              labels = sapply(kommun_ort_pairs, function(x) x$ort), 
+                              label_size = 9, 
+                              nrow = 2)
+  
+  # Add a title above the grid
+  title <- ggdraw() + draw_label(title, fontface = 'bold', size = 15)
+  
+  # Combine title and plot grid
+  plot_grid(title, plot_grid_figure, ncol = 1, rel_heights = c(0.1, 1))
+}
+
+kommun_ort_pairs <- list(
+  list(kommun = "0180", ort = "Stockholm"),
+  list(kommun = "1480", ort = "Göteborg"),
+  list(kommun = "1280", ort = "Malmö")
+)
+
+
+sabotage_sum_with_rate %>%
+  arrange(desc(Rate)) %>% 
+  slice_head(n = 10) %>% 
+  dplyr::select(deso,kommun,kommunnamn,lan,lannamn,Rate) %>% 
+  st_drop_geometry()           
+
+plot_kommun_maps(sabotage_sum_with_rate, areas, kommun_ort_pairs, title="Blåljus sabotage", colors = "YlGnBu", label_size = 9, nrow = 2)
+
+vald_sum_with_rate %>%
+  arrange(desc(Rate)) %>% 
+  slice_head(n = 10) %>% 
+  dplyr::select(deso,kommun,kommunnamn,lan,lannamn,Rate) %>% 
+  st_drop_geometry()           
+
+plot_kommun_maps(vald_sum_with_rate, areas, kommun_ort_pairs, title="Våld", colors = "YlGnBu", label_size = 9, nrow = 2)
+
+upplopp_sum_with_rate %>%
+  arrange(desc(Rate)) %>% 
+  slice_head(n = 10)  %>% 
+  dplyr::select(deso,kommun,kommunnamn,lan,lannamn,Rate) %>% 
+  st_drop_geometry()
+
+plot_kommun_maps(upplopp_sum_with_rate, areas, kommun_ort_pairs, title="Upplop", colors = "YlGnBu", label_size = 9, nrow = 2)
+
+
+```
+
+For blåljus sabotage the highest rates were recorded in neighbouhroods in Örebro and Linköping, for våld in Örebro, Linköping and Norrköping and for upplop in Stockholm, Landskrona and Linköping. Also note that the crime rates are not so highly correlated, especially for våld and upplopp. 
+
+```{r correlation}
+sabotage_sum_with_rate_renamed <- sabotage_sum_with_rate %>%
+  rename(Rate_sabotage = Rate) %>%
+  rename(Freq_sabotage = Freq) %>%
+  st_drop_geometry()
+
+vald_sum_with_rate_renamed <- vald_sum_with_rate %>%
+  rename(Rate_vald = Rate) %>%
+  rename(Freq_vald = Freq) %>%
+  st_drop_geometry()
+
+upplopp_sum_with_rate_renamed <- upplopp_sum_with_rate %>%
+  rename(Rate_upplop = Rate) %>%
+  rename(Freq_upplop = Freq) %>%
+  st_drop_geometry()
+
+combined_sum_with_rate <- sabotage_sum_with_rate_renamed %>%
+  full_join(vald_sum_with_rate_renamed, by = "deso") %>%  
+  full_join(upplopp_sum_with_rate_renamed, by = "deso")   %>%
+  dplyr::select(deso, Freq_sabotage, Rate_sabotage, Freq_vald, Rate_vald, Freq_upplop, Rate_upplop)
+
+corr_mat = cor(combined_sum_with_rate[c("Rate_sabotage", "Rate_vald", "Rate_upplop")])
+corrplot(corr_mat, method = 'number') 
+
+```
+
+### Overlay and bi-variate associations
+
+Now we need to determine which neighborhoods (DeSO) are part of the vulnerable areas and which are not and then check if neighborhoods that fall within vulnerable areas have higher rates of riot-related crime. These two geographies do not overlap as shown in figure below for Malmö. Blue lines represent boundaries of DeSo area, red lines vulnerable areas. Highlighted in yellow are DeSOs which intersect with a vulnerable area and are therefore considered to be part of the area. We can also consider some more elegant methods like "at least 50% of the neighborhood intersects with vulnerable area". 
+
+```{r overlay}
+deso <- st_read("boundaries/deso_2018_2021-10-21/DeSO_2018_v2.gpkg")
+areas <- st_read("boundaries/uso_2023_shp/uso_2023.shp")
+
+intersection_results<-st_intersects(deso, areas)
+intersection_results.df<-as.data.frame(intersection_results)
+
+deso$row.id<-as.numeric(row.names(deso))
+deso<-left_join(deso, intersection_results.df, by="row.id")
+
+deso <- deso %>%
+  mutate(is.in=case_when(col.id>0  ~ 1,
+                         is.na(col.id) ~ NA))
+
+ggplot() +
+  geom_sf(data = deso[deso$kommun=="1280",], colour = "blue", fill = NA) + 
+  geom_sf(data = deso[(deso$kommun=="1280" & deso$is.in==1) ,], aes(fill = is.in), lwd = 0.1) + 
+  scale_fill_gradientn(limits = range, 
+                       colors = RColorBrewer::brewer.pal(4, "YlGnBu")) + 
+  geom_sf(data = areas[areas$ORT=="Malmö",], colour = "red", lwd=1,  fill = NA) + 
+  theme_void() +
+  theme(legend.position = 'none')
+
+```
+
+It looks like rates are higher for all categories of crimes. Btw, should I add confidence intervals into the figures?
+
+```{r add_data}
+
+deso <- deso %>% 
+  left_join(combined_sum_with_rate)
+
+
+deso <- deso %>%
+  mutate(col.id = replace_na(col.id, 0)) %>% 
+  mutate(col.id = ifelse(col.id > 0, 1, col.id))  
+
+
+means <- deso %>% 
+  group_by(col.id) %>%
+  summarise(
+    mean.Rate_sabotage = mean(Rate_sabotage, na.rm = TRUE),
+    sd.Rate_sabotage = sd(Rate_sabotage, na.rm = TRUE),
+    mean.Rate_vald = mean(Rate_vald, na.rm = TRUE),
+    sd.Rate_vald = sd(Rate_vald, na.rm = TRUE),
+    mean.Rate_upplop = mean(Rate_upplop, na.rm = TRUE),
+    sd.Rate_upplop = sd(Rate_upplop, na.rm = TRUE), 
+  )
+
+ggplot(means) +
+  geom_bar( aes(x=as.factor(col.id), y=mean.Rate_sabotage), stat="identity") +
+  xlab("Vulnerable area") + ylab("Events per 1,000") +
+  theme_bw() +
+  ggtitle("Rate of blåljussabotage by vulnerable areas")
+
+
+ggplot(means) +
+  geom_bar( aes(x=as.factor(col.id), y=mean.Rate_vald), stat="identity") +
+  xlab("Vulnerable area") + ylab("Events per 1,000") +
+  theme_bw() +
+  ggtitle("Rate of våld against police by vulnerable areas")
+
+ggplot(means) +
+  geom_bar( aes(x=as.factor(col.id), y=mean.Rate_upplop), stat="identity") +
+  xlab("Vulnerable area") + ylab("Events per 1,000") +
+  theme_bw() +
+  ggtitle("Rate of upplopp by vulnerable areas")
+
+```
+
+## Modelling
+
+First, we read in some neighborhood data downloaded from SCBs Statistikdatabasen and then we consider different models for count data. 
+
+#### employment
+
+```{r emp}
+empl <- read_excel("deso_data/000007A8_20240813-151334.xlsx",
+                  skip=3)
+names(empl)<-c("deso","sysselsatta","arbetslösa","arbetskraften","utanför_rbetskraften","totalt_empl")
+
+empl <- empl %>%
+  drop_na(deso | totalt_empl)
+```
+
+#### education
+
+```{r edu}
+edu <- read_excel("deso_data/000005MO_20240813-151714.xlsx",
+                   skip=3)
+
+names(edu)<-c("deso","förgymnasial","gymnasial","eftergymnasial_kort","eftergymnasial_lång","saknas_edu")
+
+edu <- edu %>%
+  drop_na(deso | förgymnasial)
+```
+#### age
+
+```{r age}
+age <- read_excel("deso_data/000005FF_20240813-152010.xlsx",
+                  skip=3)
+
+names(age)<-c("deso", "totalt_age", "g1", "g2", "g3", "g4", "g5")
+
+age <- age %>%
+  drop_na(deso | totalt_age)
+```
+
+#### background
+
+According to SCB foreign background is defined as persons born abroad or born in Sweden with two foreign-born parents. Persons with swedish background are persons born in Sweden with at least one parent born in Sweden. 
+
+```{r background}
+background <- read_excel("deso_data/000005FE_20240813-152154.xlsx",
+                  skip=3)
+
+names(background)<-c("deso", "svensk", "utländsk", "totalt_background")
+
+background <- background %>%
+  drop_na(deso | totalt_background)
+```
+
+#### family type
+
+```{r family}
+family <- read_excel("deso_data/000005F8_20240813-152932.xlsx",
+                         skip=3)
+
+names(family)<-c("deso", "s_b", "s_ub", "e_b", "e_ut", "o")
+
+family <- family %>%
+  drop_na(deso | s_b)
+```
+
+#### housing tenure
+
+```{r housing}
+housing <- read_excel("deso_data/000006OC_20240813-153146.xlsx",
+                     skip=3)
+
+names(housing)<-c("deso", "hyresrätt",	"bostadsrätt",	"äganderätt",	"saknas_housing")
+
+housing <- housing %>%
+  drop_na(deso | hyresrätt)
+
+```
+
+#### income
+
+```{r inc}
+income <- read_excel("deso_data/000005FM_20240813-153407.xlsx",
+                      skip=2)
+
+names(income)<-c("deso", "medianvärde", "medelvärde", "personer_income")
+
+income <- income %>%
+  drop_na(deso | personer_income)
+```
+
+#### economic status
+
+```{r status}
+status <- read_excel("deso_data/000006TA_20240813-153551.xlsx",
+                     skip=2)
+names(status)<-c("deso", "låg", "hög", "personer_status")
+
+status <- status %>%
+  drop_na(deso | personer_status)
+```
+
+#### type of estate
+
+```{r estete}
+estates <- read_excel("deso_data/000005LO_20240813-153750.xlsx",
+                     skip=3)
+
+names(estates)<-c("deso","småhus","flerbostadshus","övriga","specialbostäder","saknas_estates","totalt_estates")
+
+estates <- estates %>%
+  drop_na(deso | totalt_estates)
+
+```
+
+#### Quran burning demos
+
+To find where Quran buring demos took place we read in the demo file that Jeff got from the police and focus only on 2022. I looked up addresses and added coordinates manually in the file. 
+
+
+```{r demo}
+
+demo <- read_excel("demo_data/A466.302-2024.xlsx")
+head(demo, 18)
+
+demo <- st_read("demo_data/A466.302-2024.shp")
+st_crs(demo)
+st_crs(deso)
+
+demo_transformed <- st_transform(demo, crs = 3006)
+
+ggplot() +
+  geom_sf(data = deso, fill = "lightblue", color = "black") +  
+  geom_sf(data = demo_transformed, color = "red", size = 2) +
+  theme_minimal() +
+  labs(title = "DeSo areas in blue, demo places in red")
+
+demo_neighbourhoods<-st_intersects(demo_transformed, deso)
+demo_neighbourhoods.df<-as.data.frame(demo_neighbourhoods)
+
+demo_neighbourhoods.df <- demo_neighbourhoods.df %>%
+  rename(row.id.demo = row.id,
+         row.id = col.id)
+
+deso$row.id<-as.numeric(row.names(deso))
+deso<-left_join(deso, demo_neighbourhoods.df, by="row.id")
+
+deso <- deso %>%
+  mutate(is.in.demo=case_when(row.id.demo>0  ~ 1,
+                              is.na(row.id.demo) ~ NA))
+
+
+```
+
+Generate a database with neighborhood statistics and create shares for variables. Add neighbourhood area and population density.
+
+```{r combine}
+
+database <- empl %>%
+  left_join(edu)  %>%
+  left_join(age)  %>%
+  left_join(background)  %>%
+  left_join(family)  %>%
+  left_join(housing)  %>%
+  left_join(income)  %>%
+  left_join(status)  %>%
+  left_join(estates)
+  
+database <- database %>% mutate_at(names(database)[-1], as.numeric) 
+
+database <- database  %>%
+  mutate(utanför_arbetskraften_p=utanför_rbetskraften/totalt_empl) %>%
+  mutate(arbetslösan_p=arbetslösa/totalt_empl) %>%
+  mutate(förgymnasial_p=(förgymnasial)/(förgymnasial+gymnasial+eftergymnasial_kort+eftergymnasial_lång+saknas_edu)) %>%
+  mutate(eftergymnasial_p=(eftergymnasial_kort+eftergymnasial_lång)/(förgymnasial+gymnasial+eftergymnasial_kort+eftergymnasial_lång+saknas_edu)) %>%
+  mutate(youth_p=(g4+g5)/totalt_age) %>%
+  mutate(utländsk_p=utländsk/totalt_background) %>%
+  mutate(ensam_med_barn_p=e_b/(s_b+s_ub+e_b+e_ut+o)) %>%
+  mutate(hyresrätt_p=hyresrätt/(hyresrätt+bostadsrätt+äganderätt+saknas_housing)) %>%
+  mutate(låg_p=låg/100) %>%
+  mutate(flerbostadshus_p=flerbostadshus/totalt_estates)
+
+pop <- read_excel("deso_data/000005FC_20240806-102837.xlsx",
+                  skip=2)[,c(-1)]
+pop <- pop %>% 
+  rename_with(~c("deso", "total"))
+
+deso <- deso %>% 
+  left_join(pop)
+
+deso$area <- st_area(deso)
+deso$area<-as.numeric(deso$area)
+deso$pop_dens= deso$total/(deso$area*0.000001)
+
+
+```
+
+To control for base level of crime add data on burglary provided by Manne and combine with database with neighborhood statistics 
+
+```{r burglary}
+
+crime<-read.csv("crime_data/burglary subset for juta.csv")
+
+table(crime$Brottskod.klartext)
+
+crime_sum <- crime %>%
+  filter(substr(Brottsdatum, 1, 4)=="2020") %>%
+  rename("deso" = "DeSO.område") %>%
+  group_by(deso) %>%
+  summarise(Freq.crime = sum(as.numeric(Antal)))
+
+crime_sum2 <- pop %>% 
+  left_join(crime_sum) %>% 
+  mutate(Freq.crime = replace_na(Freq.crime, 0)) %>% 
+  mutate(Rate.crime = Freq.crime/total*1000)
+
+deso <- deso %>% 
+  left_join(crime_sum2)
+
+database <- database %>%
+  left_join(deso)
+
+```
+#### Dependent variable
+
+Create dependent variable which is the sum of riot-related crimes for modelling and examine the data. For dependent variable the median is 0 and mean is 0.3997, there are a couple of neighborhoods which pull the distribution to the right. The variation is 12.41247, suggesting overdispersion. The Q1 consists of neighborhoods with 0 events which means that we need to consider whether hurdle or zero-inflated models would be a better choice. 
+
+The distribution shows that most of neighborhoods have 0 events and a few have a relatively high number of cases. Should we worry about the outliers?
+
+```{r dv}
+
+database <- database  %>%
+  mutate(dv=Freq_sabotage+Freq_vald+Freq_upplop)
+
+summary(database$dv)
+var(database$dv)
+
+database %>%
+  dplyr::select(deso, kommunnamn, lannamn, dv) %>%
+  arrange(desc(dv)) %>% 
+  slice_head(n = 30)
+
+ggplot(database) + 
+  geom_density(mapping=aes(dv), fill="steelblue", alpha=0.7) +
+  labs(x="Events") +
+  theme_bw()
+
+```
+
+### Poisson
+
+Start with a simple Poisson model which takes into account only share unemployed and share with foreign background in the neighborhood and an offset for the total number of people in the neighborhood. Both independent variables are statistically significant with a positive coefficient, suggesting that neighbourhood with higher unemployment and higher share of residents with foreign background have also more riot events. 
+
+```{r poisson}
+
+summary(model.prm<-glm(dv ~ arbetslösan_p + utländsk_p + offset(log(totalt_age)), family="poisson", data = database))
+
+```
+
+The next question is about overdispersion, is there enough of it to cause a problem? Seems not to be a major issue since the p-value is actually larger than 0.05 but we test what happens if we use negative bonomial regression instead. 
+
+```{r overdisp}
+
+dispersiontest(model.prm)
+
+```
+
+### Negative Binomial
+
+Now run negative binomial model and compare goodness of fit between Poisson and negative binomial regression models. Negative binomial has a larger log-likelihood and that negative binomial works better. 
+
+```{r nb}
+
+summary(model.nbrm<-glm.nb(dv ~ arbetslösan_p + utländsk_p + offset(log(totalt_age)), data = database))
+
+logLik(model.prm)
+logLik(model.nbrm)
+
+c(model.prm$aic, model.nbrm$aic)
+
+```
+
+### Testing for excess zero problem
+
+The number of observed zeros is 5034, predicted zeros are 5060 and the ratio is close to 1.
+
+```{r inflated}
+
+check_zeroinflation(model.nbrm)
+summary(model.nbrm)
+
+```
+
+### Adding model variables to negative binomial model
+
+I need to add demo variable for neighborhoods where Qurian burning demos took place or were planned. 
+
+```{r nb2}
+
+database <- database %>% mutate(is.in = ifelse(is.na(is.in), 0, is.in))
+database <- database %>% mutate(is.in.demo = ifelse(is.na(is.in.demo), 0, is.in.demo))
+
+summary(model.nbrm2<-glm.nb(dv ~ arbetslösan_p + utländsk_p + youth_p + Rate.crime + pop_dens + is.in + is.in.demo + offset(log(totalt_age)), data = database))
+
+```
+
+### Plotting the results
+
+```{r plots1}
+
+ggcoef_model(model.nbrm)
+
+ggcoef_model(model.nbrm2, variable_labels = c(
+  arbetslösan_p   = "Share unemployed",
+  utländsk_p = "Share foreign background",
+  youth_p = "Share aged 15-24",
+  Rate.crime="Burglary rate in 2020",
+  pop_dens="Persons per km2",
+  is.in = "Vulnerable area",
+  is.in.demo = "Quran burning demo"),
+  no_reference_row = broom.helpers::all_dichotomous(), show_p_values = FALSE,
+  signif_stars =FALSE) +
+  labs(title="Negative binomial", x = "Coefficients")
+
+ggpredict(model.nbrm2, terms="is.in")
+ggpredict(model.nbrm2, terms="arbetslösan_p")
+ggpredict(model.nbrm2, terms="utländsk_p")
+ggpredict(model.nbrm2, terms="Rate.crime")
+ggpredict(model.nbrm2, terms="pop_dens")
+ggpredict(model.nbrm2, terms="is.in.demo")
+
+```
+
+#### Predicted events by vulnerable area
+
+Finally we can present predicted counts for variables of interest when other variables are set to their modes. There is no statistically significant difference in the number of riot events between neighbouhroods that fall into vulnerable areas and those that don't. 
+
+```{r plots2}
+
+ggpredict(model.nbrm2, terms="is.in") %>%
+  ggplot(aes(x=as_factor(x), y=predicted)) +
+  geom_pointrange(aes(ymin=conf.low, ymax=conf.high)) + 
+  labs(title="Predicted events", x = "Vulnerable area", y = "Count") +
+  theme_bw()
+
+```
+
+#### Predicted events by demo
+
+Predicted events for whether neighborhood had a permit for Quran burning demonstration (both those that were later revoked and not). Neighbourhoods with a permit had higher number of predicted riot related crimes. 
+
+```{r predicted_demo}
+ggpredict(model.nbrm2, terms="is.in.demo") %>%
+  ggplot(aes(x=as_factor(x), y=predicted)) +
+  geom_pointrange(aes(ymin=conf.low, ymax=conf.high)) + 
+  labs(title="Predicted events", x = "Quran burning demo", y = "Count") +
+  theme_bw()
+```
+
+#### Predicted events by share unemployed 
+
+With q1 and 13 in red dashed lines and median in solid red line. 
+
+```{r predicted_emp}
+
+m<-median(database$arbetslösan_p)
+q1 <- quantile(database$arbetslösan_p, 0.25, na.rm = TRUE) 
+q3 <- quantile(database$arbetslösan_p, 0.75, na.rm = TRUE) 
+
+ggpredict(model.nbrm2, terms="arbetslösan_p") %>%
+  ggplot(aes(x=x, y=predicted)) +                                      
+  geom_line() + 
+  ylim(0, 3.7) + 
+  geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.1, fill = "steelblue") +
+  geom_vline(xintercept=m, 
+             color = "red") +
+  geom_vline(xintercept=q1, linetype="dashed",
+             color = "red") +
+  geom_vline(xintercept=q3, linetype="dashed",
+             color = "red") +
+  labs(title="Predicted events", x = "Share unemployed", y = "Count") +
+  theme_bw()
+
+```
+
+
+#### Predicted events by share foreign background 
+
+```{r predicted_utl}
+
+m<-median(database$utländsk_p)
+q1 <- quantile(database$utländsk_p, 0.25, na.rm = TRUE) 
+q3 <- quantile(database$utländsk_p, 0.75, na.rm = TRUE) 
+
+ggpredict(model.nbrm2, terms="utländsk_p") %>%
+  ggplot(aes(x=x, y=predicted)) +                                      
+  geom_line() + 
+  ylim(0, 3.7) + 
+  geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.1, fill = "steelblue") +
+  geom_vline(xintercept=m, 
+             color = "red") +
+  geom_vline(xintercept=q1, linetype="dashed",
+             color = "red") +
+  geom_vline(xintercept=q3, linetype="dashed",
+             color = "red") +
+  labs(title="Predicted events", x = "Share foreign background", y = "Count") +
+  theme_bw()
+
+```
+
+#### Predicted events by share youth
+
+```{r predicted_youth}
+
+m<-median(database$youth_p)
+q1 <- quantile(database$youth_p, 0.25, na.rm = TRUE) 
+q3 <- quantile(database$youth_p, 0.75, na.rm = TRUE) 
+
+ggpredict(model.nbrm2, terms="youth_p") %>%
+  ggplot(aes(x=x, y=predicted)) +                                      
+  geom_line() + 
+  ylim(0, 3.7) + 
+  geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.1, fill = "steelblue") +
+  geom_vline(xintercept=m, 
+             color = "red") +
+  geom_vline(xintercept=q1, linetype="dashed",
+             color = "red") +
+  geom_vline(xintercept=q3, linetype="dashed",
+             color = "red") +
+  labs(title="Predicted events", x = "Share youth", y = "Count") +
+  theme_bw()
+
+```
+
+#### Predicted events by population density
+
+```{r predicted_pop}
+
+m<-median(database$pop_dens)
+q1 <- quantile(database$pop_dens, 0.25, na.rm = TRUE) 
+q3 <- quantile(database$pop_dens, 0.75, na.rm = TRUE) 
+
+ggpredict(model.nbrm2, terms="pop_dens") %>%
+  ggplot(aes(x=x, y=predicted)) +                                      
+  geom_line() + 
+  ylim(0, 3.7) + 
+  geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.1, fill = "steelblue") +
+  geom_vline(xintercept=m, 
+             color = "red") +
+  geom_vline(xintercept=q1, linetype="dashed",
+             color = "red") +
+  geom_vline(xintercept=q3, linetype="dashed",
+             color = "red") +
+  labs(title="Predicted events", x = "Population density (persons/km2)", y = "Count") +
+  theme_bw()
+
+```
+
+#### Predicted events by 2020 levels of bulglary
+
+```{r predicted_crime}
+
+m<-median(database$Rate.crime)
+q1 <- quantile(database$Rate.crime, 0.25, na.rm = TRUE) 
+q3 <- quantile(database$Rate.crime, 0.75, na.rm = TRUE) 
+
+ggpredict(model.nbrm2, terms="Rate.crime") %>%
+  ggplot(aes(x=x, y=predicted)) +                                      
+  geom_line() + 
+  geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.1, fill = "steelblue") +
+  geom_vline(xintercept=m, 
+             color = "red") +
+  geom_vline(xintercept=q1, linetype="dashed",
+             color = "red") +
+  geom_vline(xintercept=q3, linetype="dashed",
+             color = "red") +
+  labs(title="Predicted events", x = "Rate bulglary in 2020", y = "Count") +
+  theme_bw()
+
+```
