@@ -26,6 +26,9 @@ library(performance)
 library(GGally)
 library(ggeffects)
 library(broom.helpers)
+library(lme4)
+library(lmerTest)
+library(stringr)
 
 ```
 
@@ -815,9 +818,9 @@ summary(model.nbrm)
 
 ```
 
-### Adding model variables to negative binomial model
+### Adding variables to negative binomial model
 
-I need to add demo variable for neighborhoods where Qurian burning demos took place or were planned. 
+In `model.nbrm2` we add a dummy variable for neighborhoods where Quran burning demos took place or were planned, share of youth, base crime rates in 2020, whether area is part of the vulnerable areas and population density. 
 
 ```{r nb2}
 
@@ -826,6 +829,22 @@ database <- database %>% mutate(is.in.demo = ifelse(is.na(is.in.demo), 0, is.in.
 
 summary(model.nbrm2<-glm.nb(dv ~ arbetslösan_p + utländsk_p + youth_p + Rate.crime + pop_dens + is.in + is.in.demo + offset(log(totalt_age)), data = database))
 
+```
+
+In `model.nbrm3` we introduce fixed effects at the municipal level and in `model.nbrm3`. Note that `model.nbrm4` does not converge, the error says that the model failed to converge, the next step may be to try some solutions suggested [here](https://rstudio-pubs-static.s3.amazonaws.com/33653_57fc7b8e5d484c909b615d8633c01d51.html)
+
+
+```{r nb3}
+ 
+database <- database %>%
+  mutate(kommun = str_sub(deso, 1, 4))
+
+
+summary(model.nbrm3<-glmer.nb(dv ~ offset(log(totalt_age)) + (1|kommun), data = database))
+#summary(model.nbrm4<-glmer.nb(dv ~ arbetslösan_p + utländsk_p + youth_p + Rate.crime + pop_dens + is.in + is.in.demo + offset(log(totalt_age)) + (1|kommun), data = database))
+
+```
+ 
 ```
 
 ### Plotting the results

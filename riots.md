@@ -1409,10 +1409,12 @@ summary(model.nbrm)
     ## 
     ##  2 x log-likelihood:  -7961.50500
 
-### Adding model variables to negative binomial model
+### Adding variables to negative binomial model
 
-I need to add demo variable for neighborhoods where Qurian burning demos
-took place or were planned.
+In `model.nbrm2` we add a dummy variable for neighborhoods where Quran
+burning demos took place or were planned, share of youth, base crime
+rates in 2020, whether area is part of the vulnerable areas and
+population density.
 
 ``` r
 database <- database %>% mutate(is.in = ifelse(is.na(is.in), 0, is.in))
@@ -1454,11 +1456,54 @@ summary(model.nbrm2<-glm.nb(dv ~ arbetslösan_p + utländsk_p + youth_p + Rate.c
     ## 
     ##  2 x log-likelihood:  -7798.23500
 
-### Plotting the results
+In `model.nbrm3` we introduce fixed effects at the municipal level and
+in `model.nbrm3`. Note that `model.nbrm4` does not converge, the error
+says that the model failed to converge, the next step may be to try some
+solutions suggested
+[here](https://rstudio-pubs-static.s3.amazonaws.com/33653_57fc7b8e5d484c909b615d8633c01d51.html)
 
 ``` r
-ggcoef_model(model.nbrm)
+database <- database %>%
+  mutate(kommun = str_sub(deso, 1, 4))
+
+
+summary(model.nbrm3<-glmer.nb(dv ~ offset(log(totalt_age)) + (1|kommun), data = database))
 ```
+
+    ## Generalized linear mixed model fit by maximum likelihood (Laplace
+    ##   Approximation) [glmerMod]
+    ##  Family: Negative Binomial(0.1635)  ( log )
+    ## Formula: dv ~ offset(log(totalt_age)) + (1 | kommun)
+    ##    Data: database
+    ## 
+    ##      AIC      BIC   logLik deviance df.resid 
+    ##   7977.3   7997.4  -3985.7   7971.3     6009 
+    ## 
+    ## Scaled residuals: 
+    ##    Min     1Q Median     3Q    Max 
+    ## -0.397 -0.331 -0.297 -0.264 32.917 
+    ## 
+    ## Random effects:
+    ##  Groups Name        Variance Std.Dev.
+    ##  kommun (Intercept) 0.4284   0.6545  
+    ## Number of obs: 6012, groups:  kommun, 290
+    ## 
+    ## Fixed effects:
+    ##             Estimate Std. Error z value Pr(>|z|)    
+    ## (Intercept) -9.03361    0.07695  -117.4   <2e-16 ***
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+``` r
+#summary(model.nbrm4<-glmer.nb(dv ~ arbetslösan_p + utländsk_p + youth_p + Rate.crime + pop_dens + is.in + is.in.demo + offset(log(totalt_age)) + (1|kommun), data = database))
+```
+
+
+    ### Plotting the results
+
+
+    ``` r
+    ggcoef_model(model.nbrm)
 
 ![](riots_files/figure-gfm/plots1-1.png)<!-- -->
 
