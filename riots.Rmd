@@ -833,7 +833,7 @@ summary(model.nbrm2<-glm.nb(dv ~ arbetslösan_p + utländsk_p + youth_p + Rate.c
 
 ```
 
-In `model.nbrm3` we introduce fixed effects at the municipal level and in `model.nbrm3`. Note that `model.nbrm4` does not converge, the error says that the model failed to converge, the next step may be to try some solutions suggested [here](https://rstudio-pubs-static.s3.amazonaws.com/33653_57fc7b8e5d484c909b615d8633c01d51.html)
+In `model.nbrm3` we introduce fixed effects at the municipal level. Note that `model.nbrm3` to achieve convergence we needed to scale the predictors, to compare the coefficients we re-run `model.nbrm2' and call it `model.nbrm2a`. There are not big differences in these model specifications. 
 
 
 ```{r nb3}
@@ -841,9 +841,17 @@ In `model.nbrm3` we introduce fixed effects at the municipal level and in `model
 database <- database %>%
   mutate(kommun = str_sub(deso, 1, 4))
 
+scaled_database<-database %>%
+   mutate_at(c('arbetslösan_p', 'utländsk_p', 'youth_p', 'Rate.crime'), funs(c(scale(.))))
 
-summary(model.nbrm3<-glmer.nb(dv ~ offset(log(totalt_age)) + (1|kommun), data = database))
-#summary(model.nbrm4<-glmer.nb(dv ~ arbetslösan_p + utländsk_p + youth_p + Rate.crime + pop_dens + is.in + is.in.demo + offset(log(totalt_age)) + (1|kommun), data = database))
+model.nbrm2a<-glm.nb(dv ~ arbetslösan_p + utländsk_p + youth_p + Rate.crime + log(pop_dens) + is.in + is.in.demo + offset(log(totalt_age)), data = scaled_database)
+
+model.nbrm3<-glmer.nb(dv ~ arbetslösan_p+ utländsk_p+ youth_p+  Rate.crime+ log(pop_dens)+ is.in + is.in.demo + offset(log(totalt_age)) + (1|kommun), control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)), data = scaled_database)
+
+library(sjPlot)
+#Compare the coefficients from the two models
+tab_model(model.nbrm3, model.nbrm2a)
+plot_models(model.nbrm2a, model.nbrm3)+theme_minimal()
 
 ```
  
@@ -1021,5 +1029,5 @@ ggpredict(model.nbrm2, terms="Rate.crime") %>%
              color = "red") +
   labs(title="Predicted events", x = "Rate bulglary in 2020", y = "Count") +
   theme_bw()
-
 ```
+
