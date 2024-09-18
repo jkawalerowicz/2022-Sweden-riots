@@ -1,7 +1,7 @@
 Explaining the Easter Riots in Sweden
 ================
 Juta
-16 september, 2024
+18 September, 2024
 
 ## Riot-related crimes overtimes
 
@@ -371,7 +371,7 @@ deso <- st_read("boundaries/deso_2018_2021-10-21/DeSO_2018_v2.gpkg")
 ```
 
     ## Reading layer `DeSO_2018_v2' from data source 
-    ##   `C:\Users\juka4948\Documents\Jeff Riots\2022-Sweden-riots\boundaries\deso_2018_2021-10-21\DeSO_2018_v2.gpkg' 
+    ##   `C:\Users\jemi0016\Desktop\Articles\2022-Sweden-riots\boundaries\deso_2018_2021-10-21\DeSO_2018_v2.gpkg' 
     ##   using driver `GPKG'
     ## Simple feature collection with 5984 features and 7 fields
     ## Geometry type: POLYGON
@@ -384,7 +384,7 @@ areas <- st_read("boundaries/uso_2023_shp/uso_2023.shp")
 ```
 
     ## Reading layer `uso_2023' from data source 
-    ##   `C:\Users\juka4948\Documents\Jeff Riots\2022-Sweden-riots\boundaries\uso_2023_shp\uso_2023.shp' 
+    ##   `C:\Users\jemi0016\Desktop\Articles\2022-Sweden-riots\boundaries\uso_2023_shp\uso_2023.shp' 
     ##   using driver `ESRI Shapefile'
     ## Simple feature collection with 59 features and 13 fields
     ## Geometry type: MULTIPOLYGON
@@ -648,7 +648,7 @@ deso <- st_read("boundaries/deso_2018_2021-10-21/DeSO_2018_v2.gpkg")
 ```
 
     ## Reading layer `DeSO_2018_v2' from data source 
-    ##   `C:\Users\juka4948\Documents\Jeff Riots\2022-Sweden-riots\boundaries\deso_2018_2021-10-21\DeSO_2018_v2.gpkg' 
+    ##   `C:\Users\jemi0016\Desktop\Articles\2022-Sweden-riots\boundaries\deso_2018_2021-10-21\DeSO_2018_v2.gpkg' 
     ##   using driver `GPKG'
     ## Simple feature collection with 5984 features and 7 fields
     ## Geometry type: POLYGON
@@ -661,7 +661,7 @@ areas <- st_read("boundaries/uso_2023_shp/uso_2023.shp")
 ```
 
     ## Reading layer `uso_2023' from data source 
-    ##   `C:\Users\juka4948\Documents\Jeff Riots\2022-Sweden-riots\boundaries\uso_2023_shp\uso_2023.shp' 
+    ##   `C:\Users\jemi0016\Desktop\Articles\2022-Sweden-riots\boundaries\uso_2023_shp\uso_2023.shp' 
     ##   using driver `ESRI Shapefile'
     ## Simple feature collection with 59 features and 13 fields
     ## Geometry type: MULTIPOLYGON
@@ -966,7 +966,7 @@ demo <- st_read("demo_data/A466.302-2024.shp")
 ```
 
     ## Reading layer `A466.302-2024' from data source 
-    ##   `C:\Users\juka4948\Documents\Jeff Riots\2022-Sweden-riots\demo_data\A466.302-2024.shp' 
+    ##   `C:\Users\jemi0016\Desktop\Articles\2022-Sweden-riots\demo_data\A466.302-2024.shp' 
     ##   using driver `ESRI Shapefile'
     ## Simple feature collection with 17 features and 6 fields
     ## Geometry type: POINT
@@ -1145,14 +1145,14 @@ table(crime$Brottskod.klartext)
     ## 
     ##                                                      Inbrotsstöld i fritidshus 
     ##                                                                          16663 
-    ##                                          Inbrottsstöld, fullbordat, i lägenhet 
-    ##                                                                          19181 
-    ##                                      Inbrottsstöld, fullbordat, i villa/radhus 
-    ##                                                                          25285 
     ##                                              Inbrottsstöld, försök, i lägenhet 
     ##                                                                           8103 
     ##                                          Inbrottsstöld, försök, i villa/radhus 
     ##                                                                           8254 
+    ##                                          Inbrottsstöld, fullbordat, i lägenhet 
+    ##                                                                          19181 
+    ##                                      Inbrottsstöld, fullbordat, i villa/radhus 
+    ##                                                                          25285 
     ##        Stöld av skjutvapen, ammunition och sprängämne, i bostad, ej fritidshus 
     ##                                                                            312 
     ##                   Stöld av skjutvapen, ammunition och sprängämne, i fritidshus 
@@ -1459,47 +1459,347 @@ summary(model.nbrm2<-glm.nb(dv ~ arbetslösan_p + utländsk_p + youth_p + Rate.c
     ## 
     ##  2 x log-likelihood:  -7798.23500
 
-In `model.nbrm3` we introduce fixed effects at the municipal level and
-in `model.nbrm3`. Note that `model.nbrm4` does not converge, the error
-says that the model failed to converge, the next step may be to try some
-solutions suggested
-[here](https://rstudio-pubs-static.s3.amazonaws.com/33653_57fc7b8e5d484c909b615d8633c01d51.html)
+In `model.nbrm3` we introduce fixed effects at the municipal level. Note
+that `model.nbrm3` to achieve convergence we needed to scale the
+predictors, to compare the coefficients we re-run
+`model.nbrm2' and call it`model.nbrm2a\`. There are not big differences
+in these model specifications.
 
 ``` r
 database <- database %>%
   mutate(kommun = str_sub(deso, 1, 4))
 
-
-summary(model.nbrm3<-glmer.nb(dv ~ offset(log(totalt_age)) + (1|kommun), data = database))
+scaled_database<-database %>%
+   mutate_at(c('arbetslösan_p', 'utländsk_p', 'youth_p', 'Rate.crime'), funs(c(scale(.))))
 ```
 
-    ## Generalized linear mixed model fit by maximum likelihood (Laplace
-    ##   Approximation) [glmerMod]
-    ##  Family: Negative Binomial(0.1635)  ( log )
-    ## Formula: dv ~ offset(log(totalt_age)) + (1 | kommun)
-    ##    Data: database
+    ## Warning: `funs()` was deprecated in dplyr 0.8.0.
+    ## ℹ Please use a list of either functions or lambdas:
     ## 
-    ##      AIC      BIC   logLik deviance df.resid 
-    ##   7977.3   7997.4  -3985.7   7971.3     6009 
+    ## # Simple named list: list(mean = mean, median = median)
     ## 
-    ## Scaled residuals: 
-    ##    Min     1Q Median     3Q    Max 
-    ## -0.397 -0.331 -0.297 -0.264 32.917 
+    ## # Auto named with `tibble::lst()`: tibble::lst(mean, median)
     ## 
-    ## Random effects:
-    ##  Groups Name        Variance Std.Dev.
-    ##  kommun (Intercept) 0.4284   0.6545  
-    ## Number of obs: 6012, groups:  kommun, 290
-    ## 
-    ## Fixed effects:
-    ##             Estimate Std. Error z value Pr(>|z|)    
-    ## (Intercept) -9.03361    0.07695  -117.4   <2e-16 ***
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## # Using lambdas list(~ mean(., trim = .2), ~ median(., na.rm = TRUE))
+    ## Call `lifecycle::last_lifecycle_warnings()` to see where this warning was
+    ## generated.
 
 ``` r
-#summary(model.nbrm4<-glmer.nb(dv ~ arbetslösan_p + utländsk_p + youth_p + Rate.crime + pop_dens + is.in + is.in.demo + offset(log(totalt_age)) + (1|kommun), data = database))
+model.nbrm2a<-glm.nb(dv ~ arbetslösan_p + utländsk_p + youth_p + Rate.crime + log(pop_dens) + is.in + is.in.demo + offset(log(totalt_age)), data = scaled_database)
+
+model.nbrm3<-glmer.nb(dv ~ arbetslösan_p+ utländsk_p+ youth_p+  Rate.crime+ log(pop_dens)+ is.in + is.in.demo + offset(log(totalt_age)) + (1|kommun), control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)), data = scaled_database)
+
+library(sjPlot)
 ```
+
+    ## Warning: package 'sjPlot' was built under R version 4.4.1
+
+    ## 
+    ## Attaching package: 'sjPlot'
+
+    ## The following objects are masked from 'package:cowplot':
+    ## 
+    ##     plot_grid, save_plot
+
+``` r
+#Compare the coefficients from the two models
+tab_model(model.nbrm3, model.nbrm2a)
+```
+
+<table style="border-collapse:collapse; border:none;">
+<tr>
+<th style="border-top: double; text-align:center; font-style:normal; font-weight:bold; padding:0.2cm;  text-align:left; ">
+ 
+</th>
+<th colspan="3" style="border-top: double; text-align:center; font-style:normal; font-weight:bold; padding:0.2cm; ">
+dv
+</th>
+<th colspan="3" style="border-top: double; text-align:center; font-style:normal; font-weight:bold; padding:0.2cm; ">
+dv
+</th>
+</tr>
+<tr>
+<td style=" text-align:center; border-bottom:1px solid; font-style:italic; font-weight:normal;  text-align:left; ">
+Predictors
+</td>
+<td style=" text-align:center; border-bottom:1px solid; font-style:italic; font-weight:normal;  ">
+Incidence Rate Ratios
+</td>
+<td style=" text-align:center; border-bottom:1px solid; font-style:italic; font-weight:normal;  ">
+CI
+</td>
+<td style=" text-align:center; border-bottom:1px solid; font-style:italic; font-weight:normal;  ">
+p
+</td>
+<td style=" text-align:center; border-bottom:1px solid; font-style:italic; font-weight:normal;  ">
+Incidence Rate Ratios
+</td>
+<td style=" text-align:center; border-bottom:1px solid; font-style:italic; font-weight:normal;  ">
+CI
+</td>
+<td style=" text-align:center; border-bottom:1px solid; font-style:italic; font-weight:normal;  col7">
+p
+</td>
+</tr>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
+(Intercept)
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+0.00
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+0.00 – 0.00
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+<strong>\<0.001</strong>
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+0.00
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+0.00 – 0.00
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  col7">
+<strong>\<0.001</strong>
+</td>
+</tr>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
+arbetslösan p
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+1.29
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+1.13 – 1.47
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+<strong>\<0.001</strong>
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+1.22
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+1.09 – 1.38
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  col7">
+<strong>0.001</strong>
+</td>
+</tr>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
+utländsk p
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+1.08
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+0.91 – 1.29
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+0.349
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+1.11
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+0.95 – 1.31
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  col7">
+0.164
+</td>
+</tr>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
+youth p
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+1.03
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+0.94 – 1.14
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+0.483
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+0.99
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+0.91 – 1.09
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  col7">
+0.888
+</td>
+</tr>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
+Rate crime
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+1.36
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+1.25 – 1.48
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+<strong>\<0.001</strong>
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+1.47
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+1.34 – 1.60
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  col7">
+<strong>\<0.001</strong>
+</td>
+</tr>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
+pop dens \[log\]
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+1.12
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+1.07 – 1.17
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+<strong>\<0.001</strong>
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+1.17
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+1.12 – 1.22
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  col7">
+<strong>\<0.001</strong>
+</td>
+</tr>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
+is in
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+1.04
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+0.73 – 1.49
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+0.833
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+1.32
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+0.92 – 1.89
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  col7">
+0.118
+</td>
+</tr>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
+is in demo
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+12.93
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+4.05 – 41.25
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+<strong>\<0.001</strong>
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+9.84
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
+3.55 – 41.53
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  col7">
+<strong>\<0.001</strong>
+</td>
+</tr>
+<tr>
+<td colspan="7" style="font-weight:bold; text-align:left; padding-top:.8em;">
+Random Effects
+</td>
+</tr>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; padding-top:0.1cm; padding-bottom:0.1cm;">
+σ<sup>2</sup>
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left;" colspan="3">
+8.83
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left;" colspan="3">
+ 
+</td>
+</tr>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; padding-top:0.1cm; padding-bottom:0.1cm;">
+τ<sub>00</sub>
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left;" colspan="3">
+0.20 <sub>kommun</sub>
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left;" colspan="3">
+ 
+</td>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; padding-top:0.1cm; padding-bottom:0.1cm;">
+ICC
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left;" colspan="3">
+0.02
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left;" colspan="3">
+ 
+</td>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; padding-top:0.1cm; padding-bottom:0.1cm;">
+N
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left;" colspan="3">
+290 <sub>kommun</sub>
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left;" colspan="3">
+ 
+</td>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; padding-top:0.1cm; padding-bottom:0.1cm; border-top:1px solid;">
+Observations
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left; border-top:1px solid;" colspan="3">
+6012
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left; border-top:1px solid;" colspan="3">
+6012
+</td>
+</tr>
+<tr>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; padding-top:0.1cm; padding-bottom:0.1cm;">
+Marginal R<sup>2</sup> / Conditional R<sup>2</sup>
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left;" colspan="3">
+0.051 / 0.072
+</td>
+<td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left;" colspan="3">
+0.213
+</td>
+</tr>
+</table>
+
+``` r
+plot_models(model.nbrm2a, model.nbrm3)+theme_minimal()
+```
+
+![](riots_files/figure-gfm/nb3-1.png)<!-- -->
 
 
     ### Plotting the results
