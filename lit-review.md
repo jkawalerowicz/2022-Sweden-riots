@@ -9,9 +9,7 @@ title: "Explaining the Easter Riots in Sweden"
 bibliography: references.bib
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+
 
 ## Introduction
 
