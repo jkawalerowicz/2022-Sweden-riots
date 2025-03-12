@@ -1,0 +1,4 @@
+load("/Users/jutakawalerowicz/Library/Mobile Documents/com~apple~CloudDocs/testGithub/2022-Sweden-riots/kommun_data/full_data.RData")
+ls()
+load("/Users/jutakawalerowicz/Library/Mobile Documents/com~apple~CloudDocs/testGithub/2022-Sweden-riots/kommun_data/immigrants_data.RData")
+ls()

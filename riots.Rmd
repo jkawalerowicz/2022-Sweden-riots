@@ -24,11 +24,16 @@ library(MASS)
 library(AER)
 library(performance)
 library(GGally)
+library(segregation)
 library(ggeffects)
 library(broom.helpers)
 library(lme4)
 library(lmerTest)
 library(stringr)
+library(sjPlot)
+library(sandwich)
+library(lmtest)
+library(effects)
 
 ```
 
@@ -36,11 +41,11 @@ library(stringr)
 
 See the list of riot-related crimes where we have:
 
-* cars burned
-* arson
-* violence against police offices (both light and heavy)
-* police sabotage
-* rioting 
+* Cars burned
+* Arson
+* Violence against police offices (both light and heavy)
+* Police sabotage
+* Rioting 
 
 We start by reading it the data and examining the patterns overtime. 
 
@@ -297,7 +302,6 @@ ggplot(data.month_long, aes(x = new_date, y = value, color = variable)) +
 ```
 One potential issue is that we don't know how this measures rioting and at some point it would be good to cross check geographical distribution of rioting measured with recorded crimes with newspaper coverage. Also it looks like the best crimes for capturing 2022 rioting are: upplop, våld and blåljus sabotage. 
 
-
 ## Rates for crimes in 2022
 
 Now let's look at which area had highest rates of rioting in 2022 for each of these crime categories. 
@@ -346,9 +350,10 @@ upplopp_sum_with_rate <- calculate_rates(crime_data = upplopp)
 ```
 ### Maps for 3 metropolitan municipalities
 
-Supplemented by top 10 neighbourhood (DeSO) with the highest rates
+Supplemented by top 10 neighborhoods (DeSO) with the highest rates
 
 ```{r mapping}
+library(cowplot)
 
 plot_kommun_maps <- function(deso_data, areas_data, kommun_ort_pairs, title, colors = "YlGnBu", label_size = 9, nrow = 2) {
   
@@ -379,7 +384,7 @@ plot_kommun_maps <- function(deso_data, areas_data, kommun_ort_pairs, title, col
   plot_list_with_legend <- c(plot_list, list(get_legend(p_legend)))
   
   # Create the plot grid
-  plot_grid_figure <- plot_grid(plotlist = plot_list_with_legend, 
+  plot_grid_figure <- cowplot::plot_grid(plotlist = plot_list_with_legend, 
                               labels = sapply(kommun_ort_pairs, function(x) x$ort), 
                               label_size = 9, 
                               nrow = 2)
@@ -388,7 +393,7 @@ plot_kommun_maps <- function(deso_data, areas_data, kommun_ort_pairs, title, col
   title <- ggdraw() + draw_label(title, fontface = 'bold', size = 15)
   
   # Combine title and plot grid
-  plot_grid(title, plot_grid_figure, ncol = 1, rel_heights = c(0.1, 1))
+  cowplot::plot_grid(title, plot_grid_figure, ncol = 1, rel_heights = c(0.1, 1))
 }
 
 kommun_ort_pairs <- list(
@@ -746,10 +751,109 @@ crime_sum2 <- pop %>%
 deso <- deso %>% 
   left_join(crime_sum2)
 
+#join and replace NAs with 0s
 database <- database %>%
-  left_join(deso)
+  left_join(deso) %>%
+    mutate(
+    is.in = replace_na(is.in, 0),
+    is.in.demo = replace_na(is.in.demo, 0)
+  )
 
 ```
+
+#### Add segregation
+
+Following Malmberg et al we add isolation index for foreign-born at kommun level calculated over deso.
+
+```{r segr}
+
+database <- database %>%
+  mutate(komm = substr(deso, 1, 4))
+
+#isolation index for foreign born at kommun level over deso
+database <- database %>%
+  mutate(komm = substr(deso, 1, 4)) %>%
+  dplyr::select(komm, deso,  svensk, utländsk) %>%
+  pivot_longer(cols = c("svensk", "utländsk"),
+               names_to = "group",
+               values_to = "number") %>%
+  group_by(komm) %>%
+  group_split() %>% set_names(unique(database$komm)) %>%
+  lapply(., isolation, group="group", unit="deso", weight="number") %>%
+  as.data.frame() %>%
+  slice(2) %>%
+  dplyr::select(ends_with("isolation")) %>%
+  pivot_longer(cols = ends_with("isolation"),
+               names_to = "name",
+               values_to = "isolation_utl") %>%
+    mutate(komm = substr(name, 2, 5)) %>% dplyr::select(-name) %>%
+  right_join(database)
+
+```
+#### Police relations
+
+Police perceptions where low values are high trust in police and high values are low trust in police. Note that we can also include measures based on disparities between all and immigrant perceptions, ie. if on average perceptions of the police are fine but among immigrants they are bad that could be a sign of discrimination. 
+
+We also create 2 variables where one is a measure of discrimination based on differences in perception of the police by immigrants and general population and the other is distortion, based on the absolute value of discrimination variable. 
+
+```{r police}
+load("kommun_data/full_data.RData")
+load("kommun_data/immigrants_data.RData")
+
+names(som_select)
+names(som_select_immigrants)
+
+som_select <- som_select %>%
+  right_join(som_select_immigrants[c("kommun", "year" , "Ort", "trust_police_immbackground", "concern_org_crime_immbackground")])
+
+som_select %>%
+  group_by(year) %>%
+  summarise(mean_trust_police_immbackground = mean(trust_police_immbackground, na.rm = TRUE), 
+            mean_trust_police_average = mean(trust_police_average, na.rm = TRUE)) %>%
+  ggplot(aes(x = year)) +
+  geom_line(aes(y = mean_trust_police_immbackground, color = "Immigrant Background", group="Immigrant Background")) +
+  geom_line(aes(y = mean_trust_police_average, color = "Average", group="Average")) +
+  labs(title = "Mean Trust in Police Over Years",
+       x = "Year",
+       y = "Mean Trust",
+       color = "Legend") +
+  theme_bw()
+
+cor(som_select[c("trust_police_average", "trust_police_immbackground", "concern_org_crime_average", "total_complaints", "total_investigations")], use="pairwise.complete.obs") %>%
+  corrplot(., method = 'number') 
+
+ggplot(som_select[som_select$year==2021,], aes(x = trust_police_average)) + geom_histogram() + 
+  geom_vline(aes(xintercept = mean(trust_police_average, na.rm = TRUE)), 
+             color = "red", size = 1, linetype = "dashed") +
+  theme_bw()
+
+ggplot(som_select[som_select$year==2021,], aes(x = trust_police_immbackground)) + geom_histogram() +
+   geom_vline(aes(xintercept = mean(trust_police_average, na.rm = TRUE)), 
+             color = "red", size = 1, linetype = "dashed") + theme_bw()
+
+som_select[som_select$year==2021,] %>%
+  drop_na(trust_police_immbackground) %>%
+  drop_na(trust_police_average) %>% ggplot(aes(x = trust_police_immbackground, y = trust_police_average)) + 
+  geom_point(alpha=0.2)  + theme_bw()  +
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed") + geom_rug()
+
+database$komm_n<-as.numeric(database$komm)
+
+#note that a combination of year and kommun gives some duplicated values
+which(duplicated(som_select[c("kommun", "year")]))
+
+som_select.sel<-som_select %>%
+  dplyr::select(kommun, year, trust_police_average, trust_police_immbackground) %>% filter(year==2021) %>%  distinct()
+
+database <- database %>%
+  left_join(som_select.sel, by=c("komm_n"="kommun"))
+
+#discrimination and distortion
+database$discrim=database$trust_police_average-database$trust_police_immbackground
+database$distort=abs(database$trust_police_average-database$trust_police_immbackground)
+
+```
+
 #### Dependent variable
 
 Create dependent variable which is the sum of riot-related crimes for modelling and examine the data. For dependent variable the median is 0 and mean is 0.3997, there are a couple of neighborhoods which pull the distribution to the right. The variation is 12.41247, suggesting overdispersion. The Q1 consists of neighborhoods with 0 events which means that we need to consider whether hurdle or zero-inflated models would be a better choice. 
@@ -775,22 +879,33 @@ ggplot(database) +
   theme_bw()
 
 ```
+### Correlations
+Let's have a look at correlations between the dependent variable and potential independent variables. The highest correlations are for the share foreign-born and unemployment in the neighbourhood and being on a list of utsatta områden (is.in) and both share foreign-born and unemployment. Also for kommun level segregation (isolation_utl), high correlation with share of foreign-born, population density and utsatta områden. 
 
-### Poisson
+```{r correlations}
 
-Start with a simple Poisson model which takes into account only share unemployed and share with foreign background in the neighborhood and an offset for the total number of people in the neighborhood. Both independent variables are statistically significant with a positive coefficient, suggesting that neighbourhood with higher unemployment and higher share of residents with foreign background have also more riot events. 
+corr_mat = cor(database[c("dv", "arbetslösan_p", "utländsk_p", "youth_p", "pop_dens", "Rate.crime", "is.in", "is.in.demo", "isolation_utl", "trust_police_average")], use="pairwise.complete.obs")
+corrplot(corr_mat, method = 'number', number.cex = 0.5) 
 
-```{r poisson}
-
-summary(model.prm<-glm(dv ~ arbetslösan_p + utländsk_p + offset(log(totalt_age)), family="poisson", data = database))
+summary(model.prm0<-glm(dv ~ arbetslösan_p + utländsk_p + offset(log(totalt_age)), family="poisson", data = database))
 
 ```
 
-The next question is about overdispersion, is there enough of it to cause a problem? Seems not to be a major issue since the p-value is actually larger than 0.05 but we test what happens if we use negative bonomial regression instead. 
+### Poisson
+
+Start with a simple Poisson model which takes into account only share unemployed and share with foreign background in the neighborhood and an offset for the total number of people in the neighborhood. Both independent variables are statistically significant with a positive coefficient, suggesting that neighborhood with higher unemployment and higher share of residents with foreign background have also more riot events. 
+
+```{r poisson}
+
+summary(model.prm0<-glm(dv ~ arbetslösan_p + utländsk_p + offset(log(totalt_age)), family="poisson", data = database))
+
+```
+
+The next question is about overdispersion, is there enough of it to cause a problem? Seems not to be a major issue since the p-value is actually larger than 0.05 but we test what happens if we use negative binomial regression instead. 
 
 ```{r overdisp}
 
-dispersiontest(model.prm)
+dispersiontest(model.prm0)
 
 ```
 
@@ -798,14 +913,14 @@ dispersiontest(model.prm)
 
 Now run negative binomial model and compare goodness of fit between Poisson and negative binomial regression models. Negative binomial has a larger log-likelihood and that negative binomial works better. 
 
-```{r nb}
+```{r nb0}
 
-summary(model.nbrm<-glm.nb(dv ~ arbetslösan_p + utländsk_p + offset(log(totalt_age)), data = database))
+summary(model.nbrm0<-glm.nb(dv ~ arbetslösan_p + utländsk_p + offset(log(totalt_age)), data = database))
 
-logLik(model.prm)
-logLik(model.nbrm)
+logLik(model.prm0)
+logLik(model.nbrm0)
 
-c(model.prm$aic, model.nbrm$aic)
+c(model.prm0$aic, model.nbrm0$aic)
 
 ```
 
@@ -815,25 +930,59 @@ The number of observed zeros is 5034, predicted zeros are 5060 and the ratio is 
 
 ```{r inflated}
 
-check_zeroinflation(model.nbrm)
-summary(model.nbrm)
+check_zeroinflation(model.nbrm0)
+summary(model.nbrm0)
 
 ```
 
 ### Adding variables to negative binomial model
 
-In `model.nbrm2` we add a dummy variable for neighborhoods where Quran burning demos took place or were planned, share of youth, base crime rates in 2020, whether area is part of the vulnerable areas and population density. 
+In `model.nbrm1` we add share of youth and and population density. In `model.nbr1a` we further add a dummy variable for neighborhoods where Quran burning demos took place or were planned, base crime rates in 2020 and whether the neighborhood overlapped with areas on vulnerable areas list. Model `model.nbrm1b` adds predictors at kommun level: segregation and average trust in police. Model `model.nbrm1c` replaces average trust in police with trust among immigrants and model `model.nbrm1d` adds discrimination variable, based on differences in trust in police between population and immigrants. In Model `model.nbrm1e` we see that the interaction of share foreign-born and kommun segregation is significant, see the plot below for different levels of segregation (measured by isolation index of foreign-born). Segregation seems to make a difference up till up to about 0.4 foreign-born with neighborhoods that are located in more segregated municipalities experiencing more rioting. 
 
-```{r nb2}
 
-database <- database %>% mutate(is.in = ifelse(is.na(is.in), 0, is.in))
-database <- database %>% mutate(is.in.demo = ifelse(is.na(is.in.demo), 0, is.in.demo))
+Some observations: 
 
-summary(model.nbrm2<-glm.nb(dv ~ arbetslösan_p + utländsk_p + youth_p + Rate.crime + pop_dens + is.in + is.in.demo + offset(log(totalt_age)), data = database))
+* Trust in police is not significant
+* Trust in police for immigrants is, same for discrimination
+* There is evidence of interaction between share of foreign-born and segregation
+
+```{r nb1}
+
+summary(model.nbrm1<-glm.nb(dv ~ arbetslösan_p + utländsk_p + youth_p + pop_dens + offset(log(totalt_age)), data = database))
+
+summary(model.nbrm1a<-glm.nb(dv ~ arbetslösan_p + utländsk_p + youth_p + pop_dens + Rate.crime + is.in.demo + is.in + offset(log(totalt_age)), data = database))
+
+summary(model.nbrm1b<-glm.nb(dv ~ arbetslösan_p + utländsk_p + youth_p + pop_dens + Rate.crime + is.in.demo + is.in + isolation_utl + trust_police_average + offset(log(totalt_age)), data = database))
+
+summary(model.nbrm1c<-glm.nb(dv ~ arbetslösan_p + utländsk_p + youth_p + Rate.crime + pop_dens + is.in + is.in.demo + isolation_utl + trust_police_immbackground + offset(log(totalt_age)), data = database))
+
+summary(model.nbrm1d<-glm.nb(dv ~ arbetslösan_p + utländsk_p + youth_p + Rate.crime + pop_dens + is.in + is.in.demo + isolation_utl + trust_police_average + discrim + offset(log(totalt_age)), data = database))
+
+summary(model.nbrm1e<-glm.nb(dv ~ arbetslösan_p + youth_p + Rate.crime + pop_dens + is.in + is.in.demo + utländsk_p*isolation_utl + offset(log(totalt_age)), data = database))
+
+#Compare the coefficients from the two models
+tab_model(model.nbrm1, model.nbrm1a, model.nbrm1b, model.nbrm1c, model.nbrm1d, model.nbrm1e, dv.labels=c("model.nbrm1", "model.nbrm1a", "model.nbrm1b", "model.nbrm1c", "model.nbrm1d", "model.nbrm1e"))
+
+#Let's visualise the interaction effects between share of foreign born and segregation
+
+eff <- effect("utländsk_p:isolation_utl", model.nbrm1e) 
+
+# Plot the effect
+plot(eff, 
+     main = "Interaction share foreign-born and segregation",
+     xlab = "Share foreign born",
+     ylab = "Predicted events",
+     multiline = TRUE,  
+     ci.style = "bands") 
+
+#adjust standard errors for clustering
+
+summary(model.nbrm1d)
+coeftest(model.nbrm1d, vcov = vcovCL, cluster = ~kommun)
 
 ```
 
-In `model.nbrm3` we introduce fixed effects at the municipal level. Note that `model.nbrm3` to achieve convergence we needed to scale the predictors, to compare the coefficients we re-run `model.nbrm2' and call it `model.nbrm2a`. There are not big differences in these model specifications. 
+In `model.nbrm2` we introduce fixed effects at the municipal level. Note that `model.nbrm2` to achieve convergence we needed to scale the predictors, to compare the coefficients we run re-scaled model based on previous models (without municipal level variables because these do not allow for them) and call it `model.nbrm1_scaled`. There are not big differences in these model specifications. 
 
 
 ```{r nb3}
@@ -844,43 +993,52 @@ database <- database %>%
 scaled_database<-database %>%
    mutate_at(c('arbetslösan_p', 'utländsk_p', 'youth_p', 'Rate.crime'), funs(c(scale(.))))
 
-model.nbrm2a<-glm.nb(dv ~ arbetslösan_p + utländsk_p + youth_p + Rate.crime + log(pop_dens) + is.in + is.in.demo + offset(log(totalt_age)), data = scaled_database)
+model.nbrm1_unscaled<-glm.nb(dv ~ arbetslösan_p + utländsk_p + Rate.crime + is.in + is.in.demo + offset(log(totalt_age)), data = database)
 
-model.nbrm3<-glmer.nb(dv ~ arbetslösan_p+ utländsk_p+ youth_p+  Rate.crime+ log(pop_dens)+ is.in + is.in.demo + offset(log(totalt_age)) + (1|kommun), control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)), data = scaled_database)
+model.nbrm1_scaled<-glm.nb(dv ~ arbetslösan_p + utländsk_p + Rate.crime + is.in + is.in.demo + offset(log(totalt_age)), data = scaled_database)
+
+model.nbrm2<-glmer.nb(dv ~ arbetslösan_p + utländsk_p + Rate.crime + is.in + is.in.demo + offset(log(totalt_age)) + (1|kommun), control=glmerControl(optimizer="bobyqa", optCtrl=list(maxfun=2e5)), data = scaled_database)
 
 library(sjPlot)
 #Compare the coefficients from the two models
-tab_model(model.nbrm3, model.nbrm2a)
-plot_models(model.nbrm2a, model.nbrm3)+theme_minimal()
+tab_model(model.nbrm2, model.nbrm1_scaled, model.nbrm1_unscaled, dv.labels=c("Fixed-effects", "Scaled", "Unscaled"))
+plot_models(model.nbrm1_unscaled, model.nbrm1_scaled, model.nbrm2, m.labels=c("Unscaled", "Scaled", "Fixed-effects")) + theme_minimal()
 
 ```
  
-```
+### Thoughts and questions
+* Which model should we use in discussing results?
+* Do we think results on police are worth discussing in the paper? Which model should we use?
+* Why are these such big differences in estimates for share unemployed and share foreign-born for unscaled and scaled models?
+* Which models should we use for discussing results with kommun level variables?
+* Adding trust in police in models means we drop a lot of DeSo 
 
 ### Plotting the results
 
 ```{r plots1}
 
-ggcoef_model(model.nbrm)
+ggcoef_model(model.nbrm0)
 
-ggcoef_model(model.nbrm2, variable_labels = c(
+ggcoef_model(model.nbrm1e, variable_labels = c(
   arbetslösan_p   = "Share unemployed",
   utländsk_p = "Share foreign background",
   youth_p = "Share aged 15-24",
   Rate.crime="Burglary rate in 2020",
   pop_dens="Persons per km2",
   is.in = "Vulnerable area",
+  isolation_utl = "Segregation",
   is.in.demo = "Quran burning demo"),
   no_reference_row = broom.helpers::all_dichotomous(), show_p_values = FALSE,
   signif_stars =FALSE) +
   labs(title="Negative binomial", x = "Coefficients")
 
-ggpredict(model.nbrm2, terms="is.in")
-ggpredict(model.nbrm2, terms="arbetslösan_p")
-ggpredict(model.nbrm2, terms="utländsk_p")
-ggpredict(model.nbrm2, terms="Rate.crime")
-ggpredict(model.nbrm2, terms="pop_dens")
-ggpredict(model.nbrm2, terms="is.in.demo")
+ggpredict(model.nbrm1e, terms="is.in", condition = c(totalt_age = median(database$totalt_age)))
+ggpredict(model.nbrm1e, terms="arbetslösan_p", condition = c(totalt_age = median(database$totalt_age)))
+ggpredict(model.nbrm1e, terms="utländsk_p", condition = c(totalt_age = median(database$totalt_age)))
+ggpredict(model.nbrm1e, terms="isolation_utl", condition = c(totalt_age = median(database$totalt_age)))
+ggpredict(model.nbrm1e, terms="Rate.crime", condition = c(totalt_age = median(database$totalt_age)))
+ggpredict(model.nbrm1e, terms="pop_dens", condition = c(totalt_age = median(database$totalt_age)))
+ggpredict(model.nbrm1e, terms="is.in.demo", condition = c(totalt_age = median(database$totalt_age)))
 
 ```
 
@@ -890,7 +1048,7 @@ Finally we can present predicted counts for variables of interest when other var
 
 ```{r plots2}
 
-ggpredict(model.nbrm2, terms="is.in") %>%
+ggpredict(model.nbrm1e, terms="is.in", condition = c(totalt_age = median(database$totalt_age))) %>%
   ggplot(aes(x=as_factor(x), y=predicted)) +
   geom_pointrange(aes(ymin=conf.low, ymax=conf.high)) + 
   labs(title="Predicted events", x = "Vulnerable area", y = "Count") +
@@ -903,7 +1061,7 @@ ggpredict(model.nbrm2, terms="is.in") %>%
 Predicted events for whether neighborhood had a permit for Quran burning demonstration (both those that were later revoked and not). Neighbourhoods with a permit had higher number of predicted riot related crimes. 
 
 ```{r predicted_demo}
-ggpredict(model.nbrm2, terms="is.in.demo") %>%
+ggpredict(model.nbrm1e, terms="is.in.demo", condition = c(totalt_age = median(database$totalt_age))) %>%
   ggplot(aes(x=as_factor(x), y=predicted)) +
   geom_pointrange(aes(ymin=conf.low, ymax=conf.high)) + 
   labs(title="Predicted events", x = "Quran burning demo", y = "Count") +
@@ -920,10 +1078,9 @@ m<-median(database$arbetslösan_p)
 q1 <- quantile(database$arbetslösan_p, 0.25, na.rm = TRUE) 
 q3 <- quantile(database$arbetslösan_p, 0.75, na.rm = TRUE) 
 
-ggpredict(model.nbrm2, terms="arbetslösan_p") %>%
+ggpredict(model.nbrm1e, terms="arbetslösan_p", condition = c(totalt_age = median(database$totalt_age))) %>%
   ggplot(aes(x=x, y=predicted)) +                                      
   geom_line() + 
-  ylim(0, 3.7) + 
   geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.1, fill = "steelblue") +
   geom_vline(xintercept=m, 
              color = "red") +
@@ -939,16 +1096,18 @@ ggpredict(model.nbrm2, terms="arbetslösan_p") %>%
 
 #### Predicted events by share foreign background 
 
+With q1 and 13 in red dashed lines and median in solid red line. 
+
+
 ```{r predicted_utl}
 
 m<-median(database$utländsk_p)
 q1 <- quantile(database$utländsk_p, 0.25, na.rm = TRUE) 
 q3 <- quantile(database$utländsk_p, 0.75, na.rm = TRUE) 
 
-ggpredict(model.nbrm2, terms="utländsk_p") %>%
+ggpredict(model.nbrm1e, terms="utländsk_p", condition = c(totalt_age = median(database$totalt_age))) %>%
   ggplot(aes(x=x, y=predicted)) +                                      
   geom_line() + 
-  ylim(0, 3.7) + 
   geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.1, fill = "steelblue") +
   geom_vline(xintercept=m, 
              color = "red") +
@@ -963,16 +1122,18 @@ ggpredict(model.nbrm2, terms="utländsk_p") %>%
 
 #### Predicted events by share youth
 
+With q1 and 13 in red dashed lines and median in solid red line. 
+
+
 ```{r predicted_youth}
 
 m<-median(database$youth_p)
 q1 <- quantile(database$youth_p, 0.25, na.rm = TRUE) 
 q3 <- quantile(database$youth_p, 0.75, na.rm = TRUE) 
 
-ggpredict(model.nbrm2, terms="youth_p") %>%
+ggpredict(model.nbrm1e, terms="youth_p", condition = c(totalt_age = median(database$totalt_age))) %>%
   ggplot(aes(x=x, y=predicted)) +                                      
   geom_line() + 
-  ylim(0, 3.7) + 
   geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.1, fill = "steelblue") +
   geom_vline(xintercept=m, 
              color = "red") +
@@ -987,16 +1148,18 @@ ggpredict(model.nbrm2, terms="youth_p") %>%
 
 #### Predicted events by population density
 
+With q1 and 13 in red dashed lines and median in solid red line. 
+
+
 ```{r predicted_pop}
 
 m<-median(database$pop_dens)
 q1 <- quantile(database$pop_dens, 0.25, na.rm = TRUE) 
 q3 <- quantile(database$pop_dens, 0.75, na.rm = TRUE) 
 
-ggpredict(model.nbrm2, terms="pop_dens") %>%
+ggpredict(model.nbrm1e, terms="pop_dens", condition = c(totalt_age = median(database$totalt_age))) %>%
   ggplot(aes(x=x, y=predicted)) +                                      
   geom_line() + 
-  ylim(0, 3.7) + 
   geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.1, fill = "steelblue") +
   geom_vline(xintercept=m, 
              color = "red") +
@@ -1011,13 +1174,16 @@ ggpredict(model.nbrm2, terms="pop_dens") %>%
 
 #### Predicted events by 2020 levels of bulglary
 
+With q1 and 13 in red dashed lines and median in solid red line. 
+
+
 ```{r predicted_crime}
 
 m<-median(database$Rate.crime)
 q1 <- quantile(database$Rate.crime, 0.25, na.rm = TRUE) 
 q3 <- quantile(database$Rate.crime, 0.75, na.rm = TRUE) 
 
-ggpredict(model.nbrm2, terms="Rate.crime") %>%
+ggpredict(model.nbrm1e, terms="Rate.crime", condition = c(totalt_age = median(database$totalt_age))) %>%
   ggplot(aes(x=x, y=predicted)) +                                      
   geom_line() + 
   geom_ribbon(aes(ymin=conf.low, ymax=conf.high), alpha=0.1, fill = "steelblue") +
@@ -1030,4 +1196,6 @@ ggpredict(model.nbrm2, terms="Rate.crime") %>%
   labs(title="Predicted events", x = "Rate bulglary in 2020", y = "Count") +
   theme_bw()
 ```
+
+#### Conclusions
 
